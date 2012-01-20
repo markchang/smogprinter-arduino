@@ -29,6 +29,11 @@ byte mac[] = { 0x90, 0xA2, 0xDA, 0x00, 0x97, 0x7B };
 // API key holder
 char api_key[API_KEY_LEN];
 
+// Twitter parser
+String currentLine = "";
+String tweet = "";
+boolean readingTweet = false;
+
 // ROM-based strings
 P(page_header) = "<html><head><title>Smog Printer</title></head><body>";
 P(api_key_form) = "<p><form action=\"setkey.html\" method=\"get\">API KEY: <input type=\"text\" name=\"api_key\" size=\"40\" /><input type=\"submit\" value=\"Submit\" /></form>";
@@ -137,7 +142,6 @@ void web_set_api_key(WebServer &server, WebServer::ConnectionType type, char *ur
 
 		server.httpSeeOther("/");
   }
-  server.printP(page_footer);
 }
 
 void web_destroy_api_key(WebServer &server, WebServer::ConnectionType type, char *, bool)
@@ -162,14 +166,16 @@ void connectToServer() {
 
 void setup(){
   Serial.begin(9600);
+	printer.begin();
+
+	// reserve space
+	currentLine.reserve(256);
+	tweet.reserve(150);
 
 	// pause so I can turn on serial monitoring
 	delay(3000);
 	Serial.println("Smog Printer awake.");
 
-	// initialize the printer
-  printer.begin();
-		
   // start the Ethernet connection
   if (Ethernet.begin(mac) == 0) {
     // Serial.println("Failed to configure Ethernet using DHCP");
@@ -186,16 +192,8 @@ void setup(){
   Serial.print("My IP address: ");
   Serial.println(Ethernet.localIP());
 
-	// now set up web server
-	webserver.setDefaultCommand(&web_index);
-	webserver.addCommand("setkey.html", &web_set_api_key);
-	webserver.addCommand("destroykey.html", &web_destroy_api_key);
-	
-	// start the web server
-	webserver.begin();
-	
 	// welcome user
-	  if(api_key_valid()) {
+  if(api_key_valid()) {
 		printer.println("Smog Printer ready at ");
 		printer.print("http://");
 		printer.println(Ethernet.localIP());
@@ -208,6 +206,16 @@ void setup(){
 	
   printer.feed(3);
 
+	delay(3000);
+
+	// now set up web server
+	webserver.setDefaultCommand(&web_index);
+	webserver.addCommand("setkey.html", &web_set_api_key);
+	webserver.addCommand("destroykey.html", &web_destroy_api_key);
+	
+	// start the web server
+	webserver.begin();
+	
 	connectToServer();
 }
 
@@ -222,8 +230,36 @@ void loop(){
 	// process client connection
 	if(client.connected()) {
 		if(client.available()) {
+			// read incoming byte
 			char inChar = client.read();
-			Serial.print(inChar);
+			// add to end of line
+			currentLine += inChar;
+			// clear on newline
+			if( inChar == '\n') {
+				currentLine = "";
+			}
+			// if the currentLine ends (starts) with <tweet>, it will
+			// be followed by the tweet
+			if( currentLine.endsWith("<tweet>")) {
+				// tweet is beginning, clear the current tweet string
+				readingTweet = true;
+				tweet = "";
+			}
+			// if we're in a tweet, add to the tweet string
+			if( readingTweet ) {
+				if(inChar != '<') {
+					tweet += inChar;
+				}
+				else {
+					// if we got a "<", we've reached the end of the tweet
+					readingTweet = false;
+					Serial.println(tweet);
+					printer.println(tweet);
+					printer.feed(3);
+					client.stop();
+					client_started = false;
+				}
+			}
 		} 
 	} else if(!client.connected() && client_started) {
 		// close connection
