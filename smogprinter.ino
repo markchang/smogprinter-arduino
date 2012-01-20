@@ -17,8 +17,11 @@
 #define API_KEY 1
 
 // printer configs
-int printer_RX_Pin = 2;  // this is the green wire
-int printer_TX_Pin = 3;  // this is the yellow wire
+const int printer_RX_Pin = 2;  // this is the green wire
+const int printer_TX_Pin = 3;  // this is the yellow wire
+
+// track connection state
+boolean client_started = false;
 
 // Ethernet library requires MAC address of the shield
 byte mac[] = { 0x90, 0xA2, 0xDA, 0x00, 0x97, 0x7B };
@@ -145,24 +148,33 @@ void web_destroy_api_key(WebServer &server, WebServer::ConnectionType type, char
 	server.httpSeeOther("/");
 }
 
+void connectToServer() {
+	Serial.println("Connecting to server");
+	
+	if(client.connect("10.41.8.31", 3000)) {
+		Serial.println("making HTTP request...");
+		client.println("GET /feeds?api_key=221cd34a8d2291343e129151ca2239e9395dc6ae HTTP/1.1");
+		client.println("HOST: 10.41.8.31:3000");
+		client.println();
+		client_started = true;
+	}
+}
 
 void setup(){
   Serial.begin(9600);
+
+	// pause so I can turn on serial monitoring
+	delay(3000);
 	Serial.println("Smog Printer awake.");
-	delay(5000);
 
 	// initialize the printer
-  // printer.begin();
-  
+  printer.begin();
+		
   // start the Ethernet connection
   if (Ethernet.begin(mac) == 0) {
-    Serial.println("Failed to configure Ethernet using DHCP");
-		// printer.feed(1);
-		// printer.justify('L');
-		// printer.setSize('M');
-		// printer.println("Failed to get DHCP address. Bailing.");
-		// delay(3000);
-		// printer.feed(3);
+    // Serial.println("Failed to configure Ethernet using DHCP");
+		printer.println("Failed to get DHCP address. Bailing.");
+		printer.feed(3);
 		
     // no point in carrying on, so do nothing forevermore:
     for(;;)
@@ -170,19 +182,9 @@ void setup(){
   }
 
 	// we have a DHCP license and IP address, continue setup
-
   // log the acquired IP address to the serial monitor
   Serial.print("My IP address: ");
   Serial.println(Ethernet.localIP());
-
-  // print the acquired IP address
-  // printer.feed(1);
-  // printer.justify('L');
-  // printer.setSize('M');
-  // printer.print("My IP Address: ");
-  // printer.println(Ethernet.localIP());
-  // delay(3000);
-  // printer.feed(3);
 
 	// now set up web server
 	webserver.setDefaultCommand(&web_index);
@@ -191,6 +193,22 @@ void setup(){
 	
 	// start the web server
 	webserver.begin();
+	
+	// welcome user
+	  if(api_key_valid()) {
+		printer.println("Smog Printer ready at ");
+		printer.print("http://");
+		printer.println(Ethernet.localIP());
+	} else {
+		printer.println("Smog Printer not configured.");
+		printer.println("Visit me at");
+		printer.print("http://");
+		printer.println(Ethernet.localIP());
+	}
+	
+  printer.feed(3);
+
+	connectToServer();
 }
 
 // main loop
@@ -200,4 +218,18 @@ void loop(){
 	
 	// process incoming connections one at a time forever
 	webserver.processConnection(buff, &len);
+	
+	// process client connection
+	if(client.connected()) {
+		if(client.available()) {
+			char inChar = client.read();
+			Serial.print(inChar);
+		} 
+	} else if(!client.connected() && client_started) {
+		// close connection
+		Serial.println();
+		Serial.println("disconnecting.");
+		client.stop();
+		client_started = false;
+	}
 }
