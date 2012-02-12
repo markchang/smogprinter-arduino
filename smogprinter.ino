@@ -47,7 +47,7 @@ P(separator) = " : ";
 
 // global instances
 #ifdef PRINT
-	Thermal printer(printer_RX_Pin, printer_TX_Pin);
+  Thermal printer(printer_RX_Pin, printer_TX_Pin);
 #endif
 EthernetClient client;
 WebServer webserver("", 80);
@@ -128,12 +128,12 @@ void web_set_api_key(WebServer &server, WebServer::ConnectionType type, char *ur
       rc = server.nextURLparam(&url_tail, name, NAMELEN, value, API_KEY_LEN + 1);
       if (rc != URLPARAM_EOS) {
         write_api_key(value);
-				#ifndef PRINT
+        #ifndef PRINT
         for(int i=0; i< API_KEY_LEN; i++) {
           Serial.print(value[i]);
         }
         Serial.println();
-				#endif
+        #endif
       }
     }
 
@@ -165,45 +165,45 @@ void setup() {
   Serial.begin(9600);
 
   // pause so I can turn on serial monitoring
-	#ifndef PRINT
+  #ifndef PRINT
   Serial.println("Smog Printer awake.");
-	Serial.println("... 3 seconds ...");
-	#endif
-	delay(3000);
+  Serial.println("... 3 seconds ...");
+  #endif
+  delay(3000);
 
   // start the Ethernet connection
   if (Ethernet.begin(mac) == 0) {
-		#ifndef PRINT
+    #ifndef PRINT
     Serial.println("Failed to configure Ethernet using DHCP");
-		#endif
+    #endif
     // no point in carrying on, so do nothing forevermore:
     for(;;)
-			;
+      ;
   }
 
   // we have a DHCP license and IP address, continue setup
   // log the acquired IP address to the serial monitor
-	#ifndef PRINT
+  #ifndef PRINT
   Serial.print("My IP address: ");
   Serial.println(Ethernet.localIP());
-	#endif
+  #endif
 
   // welcome user
-	#ifdef PRINT
-		printer.begin();
-	  if(api_key_valid()) {
-	    printer.println("Smog Printer ready at ");
-	    printer.print("http://");
-	    printer.println(Ethernet.localIP());
-	  } else {
-	    printer.println("Smog Printer not configured.");
-	    printer.println("Visit me at");
-	    printer.print("http://");
-	    printer.println(Ethernet.localIP());
-	  }
+  #ifdef PRINT
+    printer.begin();
+    if(api_key_valid()) {
+      printer.println("Smog Printer ready at ");
+      printer.print("http://");
+      printer.println(Ethernet.localIP());
+    } else {
+      printer.println("Smog Printer not configured.");
+      printer.println("Visit me at");
+      printer.print("http://");
+      printer.println(Ethernet.localIP());
+    }
   
-	  printer.feed(3);
-	#endif
+    printer.feed(3);
+  #endif
   
   // now set up web server
   webserver.setDefaultCommand(&web_index);
@@ -251,11 +251,11 @@ void loop(){
           // if we got a "<", we've reached the end of the tweet
           readingTweet = false;
           #ifdef PRINT
- 						printer.println(tweet);
- 	          printer.feed(3);
-					#else
-	          Serial.println(tweet);
- 					#endif
+            printer.println(tweet);
+            printer.feed(3);
+          #else
+            Serial.println(tweet);
+          #endif
           client.stop();
           client_started = false;
         }
@@ -263,10 +263,10 @@ void loop(){
     } 
   } else if(!client.connected() && client_started) {
     // close connection
-		#ifndef PRINT
+    #ifndef PRINT
     Serial.println();
     Serial.println("disconnecting.");
-		#endif
+    #endif
     client.stop();
     client_started = false;
   }
